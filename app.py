@@ -114,17 +114,29 @@ def temp_start(start):
     # Create a session (link) from Python to the DB
     session = Session(engine)
 
+    try:
+        # Validate and convert start date
+        valid_start = dt.datetime.strptime(start, '%Y-%m-%d')
+    except ValueError:
+        return jsonify({"error": "Invalid date format. Use YYYY-MM-DD."}), 400
+
     # Query to calculate TMIN, TAVG, and TMAX for all dates greater than or equal to the start date
     results = session.query(func.min(Measurement.tobs), func.avg(Measurement.tobs), func.max(Measurement.tobs))\
-        .filter(Measurement.date >= start)\
+        .filter(Measurement.date >= valid_start)\
         .all()
 
     session.close()
 
+    # Check if results are empty and handle accordingly
+    if not results or not all(results[0]):
+        return jsonify({"error": "No data found for the given start date."}), 404
+
     # Convert query results to a list of dictionaries
-    temp_data = [{"TMIN": result[0], "TAVG": result[1], "TMAX": result[2]} for result in results]
+    temp_data = [{"TMIN": results[0][0], "TAVG": results[0][1], "TMAX": results[0][2]}]
 
     return jsonify(temp_data)
+
+
 
 @app.route("/api/v1.0/<start>/<end>")
 def temp_start_end(start, end):
