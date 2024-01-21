@@ -38,6 +38,7 @@ def home():
         f"/api/v1.0/&lt;start&gt;<br/>"
         f"/api/v1.0/&lt;start&gt;/&lt;end&gt;<br/>"
     )
+
 @app.route("/api/v1.0/precipitation")
 def precipitation():
     # Create a session (link) from Python to the DB
@@ -53,6 +54,7 @@ def precipitation():
         filter(Measurement.date >= one_year_ago).\
         all()
 
+    # Close the session
     session.close()
 
     # Convert the query results to a dictionary using date as the key and prcp as the value
@@ -60,11 +62,6 @@ def precipitation():
 
     return jsonify(precipitation_dict)
 
-
-
-#################################################
-# Flask Routes
-#################################################
 @app.route("/api/v1.0/stations")
 def stations():
     # Create a session (link) from Python to the DB
@@ -146,5 +143,6 @@ def temp_start_end(start, end):
     temp_data = [{"TMIN": result[0], "TAVG": result[1], "TMAX": result[2]} for result in results]
 
     return jsonify(temp_data)
+
 if __name__ == '__main__':
     app.run()
