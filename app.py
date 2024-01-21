@@ -15,11 +15,11 @@ Base = automap_base()
 # reflect the tables
 Base.prepare(engine, reflect=True)
 
-# Save references to each table
+# references to each table
 Station = Base.classes.station
 Measurement = Base.classes.measurement
 
-# Create our session (link) from Python to the DB
+# session link
 session = Session(engine)
 
 #################################################
@@ -30,7 +30,7 @@ session = Session(engine)
 def home():
     """List all available api routes."""
     return (
-        f"Welcome to the Climate Analysis API!<br/>"
+        f"Welcome to climate analysis API!<br/>"
         f"Available Routes:<br/>"
         f"/api/v1.0/precipitation<br/>"
         f"/api/v1.0/stations<br/>"
@@ -39,56 +39,59 @@ def home():
         f"/api/v1.0/&lt;start&gt;/&lt;end&gt;<br/>"
     )
 
+## route for precip
 @app.route("/api/v1.0/precipitation")
 def precipitation():
-    # Create a session (link) from Python to the DB
+    # session link
     session = Session(engine)
 
-    # Calculate the date one year ago from the last data point in the database
+    # calc date one year ago from last data point in database
     last_date = session.query(Measurement.date).order_by(Measurement.date.desc()).first()[0]
     last_date = dt.datetime.strptime(last_date, "%Y-%m-%d")
     one_year_ago = last_date - dt.timedelta(days=365)
 
-    # Perform a query to retrieve the data and precipitation scores
+    # query to retrieve data and precip scores
     results = session.query(Measurement.date, Measurement.prcp).\
         filter(Measurement.date >= one_year_ago).\
         all()
 
-    # Close the session
+    # close
     session.close()
 
-    # Convert the query results to a dictionary using date as the key and prcp as the value
+    # convert the query results to dictionary using date as the key and prcp as the value
     precipitation_dict = {date: prcp for date, prcp in results}
 
     return jsonify(precipitation_dict)
 
+## route for stations
 @app.route("/api/v1.0/stations")
 def stations():
-    # Create a session (link) from Python to the DB
+    # session link
     session = Session(engine)
 
-    # Perform a query to retrieve the stations
+    # query to retrieve stations
     results = session.query(Station.station).all()
 
     session.close()
 
-    # Convert the query results to a list
+    # convert query results to list
     stations_list = [station[0] for station in results]
 
     return jsonify(stations_list)
 
+## route for tobs
 @app.route("/api/v1.0/tobs")
 def tobs():
-    # Create a session (link) from Python to the DB
+    # session link
     session = Session(engine)
 
-    # Find the most active station
+    # most active station
     most_active_station = session.query(Measurement.station)\
         .group_by(Measurement.station)\
         .order_by(func.count(Measurement.id).desc())\
         .first()[0]
 
-    # Calculate the date one year ago from the last data point in the database
+    # calc date one year ago from last data point in database
     last_date = session.query(Measurement.date)\
         .filter(Measurement.station == most_active_station)\
         .order_by(Measurement.date.desc())\
@@ -96,7 +99,7 @@ def tobs():
     last_date = dt.datetime.strptime(last_date, "%Y-%m-%d")
     one_year_ago = last_date - dt.timedelta(days=365)
 
-    # Query the dates and temperature observations of the most-active station for the previous year of data
+    # query dates and temp observations of the most active station for previous year of data
     results = session.query(Measurement.date, Measurement.tobs)\
         .filter(Measurement.station == most_active_station)\
         .filter(Measurement.date >= one_year_ago)\
@@ -104,46 +107,47 @@ def tobs():
 
     session.close()
 
-    # Convert the query results to a list of dictionaries
+    # convert query results to list of dictionaries
     tobs_list = [{"date": date, "tobs": tobs} for date, tobs in results]
 
     return jsonify(tobs_list)
 
+## route for start date
 @app.route("/api/v1.0/<start>")
 def temp_start(start):
-    # Create a session (link) from Python to the DB
+    # session link
     session = Session(engine)
 
     try:
-        # Validate and convert start date
+        # validate and convert start date
         valid_start = dt.datetime.strptime(start, '%Y-%m-%d')
     except ValueError:
         return jsonify({"error": "Invalid date format. Use YYYY-MM-DD."}), 400
 
-    # Query to calculate TMIN, TAVG, and TMAX for all dates greater than or equal to the start date
+    # calculate TMIN, TAVG, and TMAX for dates greater than or equal to start date
     results = session.query(func.min(Measurement.tobs), func.avg(Measurement.tobs), func.max(Measurement.tobs))\
         .filter(Measurement.date >= valid_start)\
         .all()
 
     session.close()
 
-    # Check if results are empty and handle accordingly
+    # check if results are empty
     if not results or not all(results[0]):
         return jsonify({"error": "No data found for the given start date."}), 404
 
-    # Convert query results to a list of dictionaries
+    # convert query to list of dictionaries
     temp_data = [{"TMIN": results[0][0], "TAVG": results[0][1], "TMAX": results[0][2]}]
 
     return jsonify(temp_data)
 
 
-
+## Route for start and end date
 @app.route("/api/v1.0/<start>/<end>")
 def temp_start_end(start, end):
-    # Create a session (link) from Python to the DB
+    # session link
     session = Session(engine)
 
-    # Query to calculate TMIN, TAVG, and TMAX from start to end date
+    # calculate TMIN, TAVG, and TMAX from start to end date
     results = session.query(func.min(Measurement.tobs), func.avg(Measurement.tobs), func.max(Measurement.tobs))\
         .filter(Measurement.date >= start)\
         .filter(Measurement.date <= end)\
@@ -151,7 +155,7 @@ def temp_start_end(start, end):
 
     session.close()
 
-    # Convert query results to a list of dictionaries
+    # convert query results to list of dictionaries
     temp_data = [{"TMIN": result[0], "TAVG": result[1], "TMAX": result[2]} for result in results]
 
     return jsonify(temp_data)
